@@ -1,5 +1,5 @@
 {
-  "name": "test-blog",
+  "name": "my-page",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,5 +14,10 @@
     "react": "^18",
     "react-dom": "^18",
     "react-markdown": "^9.0.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0"
   }
 }

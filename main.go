@@ -1,57 +1,28 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
+	"os/exec"
 )
 
-//  - next app -
-// app
-// 	  /layout.jsx
-//    /page.jsx
-
 func main() {
-	dirName := "./test-blog/app/"
+	script := "./runCreateBlog.sh"
+	cmd := exec.Command("bash", script)
 
-	file, err := os.Create(dirName + "page.js")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// Start the command
+	err := cmd.Start()
 	if err != nil {
-		fmt.Println("Error:", err)
-		return
+		log.Fatalf("Failed to start command: %s", err)
 	}
-	defer file.Close()
 
-	// Step 2: Read the file
-	data, err := os.ReadFile("s3/blog1.md")
+	// Wait for the command to finish
+	err = cmd.Wait()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Command finished with error: %s", err)
 	}
 
-	imports := `
-		import { Flex, Text, Button } from '@radix-ui/themes';
-		import Markdown from 'react-markdown'
-
-	`
-	mdVariable := fmt.Sprintf("const md = `%s`", data)
-
-	code2 := `
-
-	export default function MyApp() {
-		return (
-			<Flex direction="column" gap="2">
-				<Markdown>
-					{md}
-				</Markdown>
-			</Flex>
-		);
-	}
-	`
-
-	_, err = file.WriteString(imports + mdVariable + code2)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	fmt.Println("File written successfully")
 }
