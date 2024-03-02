@@ -13,7 +13,4 @@ go run .
 
 cd ..
 cd my-page
-npm run dev
-
-
-
+npm run build
