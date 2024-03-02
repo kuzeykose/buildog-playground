@@ -11,9 +11,7 @@ phases:
     commands:
       - echo Build started on `date`
       - go run main.go
+      - bash ./deploy.sh
   post_build:
     commands:
       - echo Build completed on `date`
-artifacts:
-  files:
-    - target/messageUtil-1.0.jar
