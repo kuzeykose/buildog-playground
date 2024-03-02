@@ -78,5 +78,25 @@ func createBlog(selectedFile fs.DirEntry) {
 		return
 	}
 
+	newfile, err := os.Create("../my-page/next.config.mjs")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer newfile.Close()
+
+	_, err = newfile.WriteString(`
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+	output: "export",
+};
+
+export default nextConfig;	
+	`)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
 	fmt.Println("File written successfully")
 }

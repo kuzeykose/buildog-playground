@@ -14,3 +14,12 @@ go run .
 cd ..
 cd my-page
 npm run build
+
+mv out ../
+
+cd ..
+rm -rf my-page
+
+aws s3 sync ./out "s3://test-os-buildog"
+
+rm -rf out
