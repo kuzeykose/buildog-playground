@@ -53,7 +53,6 @@ func createBlog(selectedFile fs.DirEntry) {
 	}
 
 	imports := `
-		import { Flex, Text, Button } from '@radix-ui/themes';
 		import Markdown from 'react-markdown'
 
 	`
@@ -63,11 +62,11 @@ func createBlog(selectedFile fs.DirEntry) {
 
 	export default function MyApp() {
 		return (
-			<Flex direction="column" gap="2">
+			<article class="prose lg:prose-xl">			
 				<Markdown>
 					{md}
 				</Markdown>
-			</Flex>
+			</article>
 		);
 	}
 	`
@@ -98,5 +97,44 @@ export default nextConfig;
 		return
 	}
 
+	tailwindConfig()
+
 	fmt.Println("File written successfully")
+}
+
+func tailwindConfig() {
+	newfile, err := os.Create("../my-page/tailwind.config.js")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer newfile.Close()
+
+	_, err = newfile.WriteString(`
+	/** @type {import('tailwindcss').Config} */
+	module.exports = {
+	  content: [
+		"./pages/**/*.{js,ts,jsx,tsx,mdx}",
+		"./components/**/*.{js,ts,jsx,tsx,mdx}",
+		"./app/**/*.{js,ts,jsx,tsx,mdx}",
+	  ],
+	  theme: {
+		extend: {
+		  backgroundImage: {
+			"gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+			"gradient-conic":
+			  "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+		  },
+		},
+	  },
+	  plugins: [
+    	require('@tailwindcss/typography'),
+  		],
+	};
+	
+	`)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
 }
