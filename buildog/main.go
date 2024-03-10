@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -36,7 +37,8 @@ func main() {
 			log.Printf("Bucket: %v. Here's why: %v\n", bucketName, err)
 		}
 
-		createBlog(file, *v.Key)
+		selectedFileName, _ := strings.CutSuffix(*v.Key, ".md")
+		createBlog(file, selectedFileName)
 	}
 }
 
@@ -174,12 +176,12 @@ func (basics BucketBasics) DownloadFile(bucketName string, objectKey string, fil
 		// return err
 	}
 	defer result.Body.Close()
-	file, err := os.Create(fileName)
-	if err != nil {
-		log.Printf("Couldn't create file %v. Here's why: %v\n", fileName, err)
-		// return err
-	}
-	defer file.Close()
+	// file, err := os.Create(fileName)
+	// if err != nil {
+	// 	log.Printf("Couldn't create file %v. Here's why: %v\n", fileName, err)
+	// 	// return err
+	// }
+	// defer file.Close()
 	body, err := io.ReadAll(result.Body)
 	if err != nil {
 		log.Printf("Couldn't read object body from %v. Here's why: %v\n", objectKey, err)
