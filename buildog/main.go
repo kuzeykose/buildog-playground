@@ -31,6 +31,11 @@ func main() {
 	basics := BucketBasics{s3Client}
 	a, _ := basics.ListObjects(bucketName)
 
+    CreateHeader()
+    CreateFooter()
+    CreateBlogPage()
+    CreateBlogLayout()
+
 	for _, v := range a {
 		file, err := basics.DownloadFile(bucketName, *v.Key, *v.Key)
 		if err != nil {
@@ -43,9 +48,7 @@ func main() {
 }
 
 func createBlog(data []byte, fileName string) {
-	// selectedFileName, _ := strings.CutSuffix(selectedFile.Name(), ".md")
-
-	dirName := "../my-page/app/" + fileName + "/"
+	dirName := "../my-page/app/blog/" + fileName + "/"
 
 	// create folder
 	err := os.MkdirAll(dirName, 0755) // 0755 is a common permission setting
@@ -61,11 +64,6 @@ func createBlog(data []byte, fileName string) {
 	}
 	defer file.Close()
 
-	// data, err := os.ReadFile("../s3/" + selectedFile.Name())
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
 	imports := `
 		import Markdown from 'react-markdown'
 
@@ -73,7 +71,6 @@ func createBlog(data []byte, fileName string) {
 	mdVariable := fmt.Sprintf("const md = `%s`", data)
 
 	code2 := `
-
 	export default function MyApp() {
 		return (
 			<article class="prose lg:prose-xl">			
@@ -111,46 +108,7 @@ export default nextConfig;
 		return
 	}
 
-	tailwindConfig()
-
 	fmt.Println("File written successfully")
-}
-
-func tailwindConfig() {
-	newfile, err := os.Create("../my-page/tailwind.config.js")
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	defer newfile.Close()
-
-	_, err = newfile.WriteString(`
-	/** @type {import('tailwindcss').Config} */
-	module.exports = {
-	  content: [
-		"./pages/**/*.{js,ts,jsx,tsx,mdx}",
-		"./components/**/*.{js,ts,jsx,tsx,mdx}",
-		"./app/**/*.{js,ts,jsx,tsx,mdx}",
-	  ],
-	  theme: {
-		extend: {
-		  backgroundImage: {
-			"gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-			"gradient-conic":
-			  "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-		  },
-		},
-	  },
-	  plugins: [
-    	require('@tailwindcss/typography'),
-  		],
-	};
-	
-	`)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
 }
 
 func (basics BucketBasics) ListObjects(bucketName string) ([]types.Object, error) {
