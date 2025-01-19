@@ -6,12 +6,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 type BucketBasics struct {
@@ -19,44 +19,97 @@ type BucketBasics struct {
 }
 
 func main() {
-	sdkConfig, err := config.LoadDefaultConfig(context.TODO())
+	ctx := context.Background()
+
+	// Initialize the AWS S3 client
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		fmt.Println("Couldn't load default configuration. Have you set up your AWS account?")
+		fmt.Println("Couldn't initialize AWS configuration. Have you set up your AWS credentials?")
 		fmt.Println(err)
 		return
 	}
+	s3Client := s3.NewFromConfig(cfg)
 
-	bucketName := "blogs-repo-test"
-	s3Client := s3.NewFromConfig(sdkConfig)
+	CreateHeader()
+	CreateFooter()
+	CreateBlogPage()
+	CreateBlogLayout()
+
+	bucketName := "buildog-web"
+	prefix := "50238b4c-4932-40c9-afa1-b23ca796ae94/documents/" // The root folder prefix
 	basics := BucketBasics{s3Client}
-	a, _ := basics.ListObjects(bucketName)
 
-    CreateHeader()
-    CreateFooter()
-    CreateBlogPage()
-    CreateBlogLayout()
+	// List and process documents
+	err = basics.ProcessDocuments(ctx, bucketName, prefix)
+	if err != nil {
+		log.Fatalf("Error processing documents: %v", err)
+	}
+}
 
-	for _, v := range a {
-		file, err := basics.DownloadFile(bucketName, *v.Key, *v.Key)
+// ProcessDocuments lists objects under a specific prefix and processes them
+func (basics BucketBasics) ProcessDocuments(ctx context.Context, bucketName, prefix string) error {
+	paginator := s3.NewListObjectsV2Paginator(basics.S3Client, &s3.ListObjectsV2Input{
+		Bucket:    &bucketName,
+		Prefix:    &prefix,
+		Delimiter: aws.String("/"), // To treat '/' as a folder separator
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			log.Printf("Bucket: %v. Here's why: %v\n", bucketName, err)
+			return fmt.Errorf("error listing bucket objects: %v", err)
 		}
 
-		selectedFileName, _ := strings.CutSuffix(*v.Key, ".md")
-		createBlog(file, selectedFileName)
+		for _, object := range page.Contents {
+			if strings.HasSuffix(*object.Key, ".md") { // Only process .md files
+				fmt.Printf("Processing file: %s\n", *object.Key)
+				data, err := basics.DownloadFile(ctx, bucketName, *object.Key)
+				if err != nil {
+					log.Printf("Error downloading file %s: %v\n", *object.Key, err)
+					continue
+				}
+
+				// Extract folder name and file name
+				relativePath := strings.TrimPrefix(*object.Key, prefix)
+				dir, file := path.Split(relativePath)
+				fmt.Print(dir)
+				fileName := strings.TrimSuffix(file, ".md")
+
+				// Process the document
+				createBlog(data, fileName)
+			}
+		}
 	}
+
+	return nil
+}
+
+// DownloadFile fetches a file's content from the bucket
+func (basics BucketBasics) DownloadFile(ctx context.Context, bucketName, objectKey string) ([]byte, error) {
+	result, err := basics.S3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key:    &objectKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get object %s from bucket %s: %v", objectKey, bucketName, err)
+	}
+	defer result.Body.Close()
+
+	data, err := io.ReadAll(result.Body)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read object body: %v", err)
+	}
+	return data, nil
 }
 
 func createBlog(data []byte, fileName string) {
 	dirName := "../my-page/app/blog/" + fileName + "/"
 
-	// create folder
 	err := os.MkdirAll(dirName, 0755) // 0755 is a common permission setting
 	if err != nil {
 		log.Fatalf("Failed to create directory: %s", err)
 	}
 
-	// create file
 	file, err := os.Create(dirName + "page.js")
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -96,12 +149,12 @@ func createBlog(data []byte, fileName string) {
 	defer newfile.Close()
 
 	_, err = newfile.WriteString(`
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-	output: "export",
-};
+		/** @type {import('next').NextConfig} */
+		const nextConfig = {
+			output: "export",
+		};
 
-export default nextConfig;	
+		export default nextConfig;	
 	`)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -109,40 +162,4 @@ export default nextConfig;
 	}
 
 	fmt.Println("File written successfully")
-}
-
-func (basics BucketBasics) ListObjects(bucketName string) ([]types.Object, error) {
-	result, err := basics.S3Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucketName),
-	})
-	var contents []types.Object
-	if err != nil {
-		log.Printf("Couldn't list objects in bucket %v. Here's why: %v\n", bucketName, err)
-	} else {
-		contents = result.Contents
-	}
-	return contents, err
-}
-
-func (basics BucketBasics) DownloadFile(bucketName string, objectKey string, fileName string) ([]byte, error) {
-	result, err := basics.S3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(objectKey),
-	})
-	if err != nil {
-		log.Printf("Couldn't get object %v:%v. Here's why: %v\n", bucketName, objectKey, err)
-		// return err
-	}
-	defer result.Body.Close()
-	// file, err := os.Create(fileName)
-	// if err != nil {
-	// 	log.Printf("Couldn't create file %v. Here's why: %v\n", fileName, err)
-	// 	// return err
-	// }
-	// defer file.Close()
-	body, err := io.ReadAll(result.Body)
-	if err != nil {
-		log.Printf("Couldn't read object body from %v. Here's why: %v\n", objectKey, err)
-	}
-	return body, err
 }
