@@ -4,6 +4,7 @@ phases:
   install:
     runtime-versions:
       golang: 1.21
+      nodejs: 18.17
   pre_build:
     commands:
       - echo Nothing to do in the pre_build phase...
