@@ -9,33 +9,35 @@ import (
 	"path"
 	"strings"
 
-	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 type BucketBasics struct {
-	StorageClient *storage.Client
+	S3Client *s3.Client
 }
 
 func main() {
 	ctx := context.Background()
 
-	// Initialize the GCS client
-	storageClient, err := storage.NewClient(ctx)
+	// Initialize the AWS S3 client
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		fmt.Println("Couldn't initialize Google Cloud Storage client. Have you set up your Google Cloud credentials?")
+		fmt.Println("Couldn't initialize AWS configuration. Have you set up your AWS credentials?")
 		fmt.Println(err)
 		return
 	}
-	defer storageClient.Close()
+	s3Client := s3.NewFromConfig(cfg)
 
 	CreateHeader()
 	CreateFooter()
 	CreateBlogPage()
 	CreateBlogLayout()
 
-	bucketName := "buildog"
-	prefix := "ad8c0536-1c84-4ce1-9386-b5d0fea6fab0/" // The root folder prefix
-	basics := BucketBasics{storageClient}
+	bucketName := "buildog-web"
+	prefix := "50238b4c-4932-40c9-afa1-b23ca796ae94/documents/" // The root folder prefix
+	basics := BucketBasics{s3Client}
 
 	// List and process documents
 	err = basics.ProcessDocuments(ctx, bucketName, prefix)
@@ -46,36 +48,36 @@ func main() {
 
 // ProcessDocuments lists objects under a specific prefix and processes them
 func (basics BucketBasics) ProcessDocuments(ctx context.Context, bucketName, prefix string) error {
-	it := basics.StorageClient.Bucket(bucketName).Objects(ctx, &storage.Query{
-		Prefix:    prefix,
-		Delimiter: "/", // To treat '/' as a folder separator
+	paginator := s3.NewListObjectsV2Paginator(basics.S3Client, &s3.ListObjectsV2Input{
+		Bucket:    &bucketName,
+		Prefix:    &prefix,
+		Delimiter: aws.String("/"), // To treat '/' as a folder separator
 	})
 
-	for {
-		obj, err := it.Next()
-		if err == io.EOF {
-			break
-		}
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			return fmt.Errorf("error iterating through bucket objects: %v", err)
+			return fmt.Errorf("error listing bucket objects: %v", err)
 		}
 
-		if strings.HasSuffix(obj.Name, ".md") { // Only process .md files
-			fmt.Printf("Processing file: %s\n", obj.Name)
-			data, err := basics.DownloadFile(ctx, bucketName, obj.Name)
-			if err != nil {
-				log.Printf("Error downloading file %s: %v\n", obj.Name, err)
-				continue
+		for _, object := range page.Contents {
+			if strings.HasSuffix(*object.Key, ".md") { // Only process .md files
+				fmt.Printf("Processing file: %s\n", *object.Key)
+				data, err := basics.DownloadFile(ctx, bucketName, *object.Key)
+				if err != nil {
+					log.Printf("Error downloading file %s: %v\n", *object.Key, err)
+					continue
+				}
+
+				// Extract folder name and file name
+				relativePath := strings.TrimPrefix(*object.Key, prefix)
+				dir, file := path.Split(relativePath)
+				fmt.Print(dir)
+				fileName := strings.TrimSuffix(file, ".md")
+
+				// Process the document
+				createBlog(data, fileName)
 			}
-
-			// Extract folder name and file name
-			relativePath := strings.TrimPrefix(obj.Name, prefix)
-			dir, file := path.Split(relativePath)
-			fmt.Print(dir)
-			fileName := strings.TrimSuffix(file, ".md")
-
-			// Process the document
-			createBlog(data, fileName)
 		}
 	}
 
@@ -83,14 +85,17 @@ func (basics BucketBasics) ProcessDocuments(ctx context.Context, bucketName, pre
 }
 
 // DownloadFile fetches a file's content from the bucket
-func (basics BucketBasics) DownloadFile(ctx context.Context, bucketName, objectName string) ([]byte, error) {
-	rc, err := basics.StorageClient.Bucket(bucketName).Object(objectName).NewReader(ctx)
+func (basics BucketBasics) DownloadFile(ctx context.Context, bucketName, objectKey string) ([]byte, error) {
+	result, err := basics.S3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key:    &objectKey,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read object %s from bucket %s: %v", objectName, bucketName, err)
+		return nil, fmt.Errorf("couldn't get object %s from bucket %s: %v", objectKey, bucketName, err)
 	}
-	defer rc.Close()
+	defer result.Body.Close()
 
-	data, err := io.ReadAll(rc)
+	data, err := io.ReadAll(result.Body)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read object body: %v", err)
 	}

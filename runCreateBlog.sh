@@ -20,11 +20,16 @@ cd ..
 cd my-page
 npm run build
 
+rm -rf node_modules
+rm -rf package-lock.json
+rm -rf .next
+
 mv out ../
 
-# cd ..
-# rm -rf my-page
+cd ..
 
-# aws s3 sync ./out "s3://test-os-buildog"
+aws s3 sync ./my-page "s3://buildog-web/${ORGANIZATION_ID}/app/"
+aws s3 sync ./out "s3://buildog-web/${ORGANIZATION_ID}/web/"
 
-# rm -rf out
+rm -rf out
+rm -rf my-page
