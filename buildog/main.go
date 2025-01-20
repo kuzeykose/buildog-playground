@@ -36,7 +36,7 @@ func main() {
 	CreateBlogLayout()
 
 	bucketName := "buildog-web"
-	prefix := "50238b4c-4932-40c9-afa1-b23ca796ae94/documents/" // The root folder prefix
+	prefix := os.Getenv("ORGANIZATION_ID") + "/documents/"
 	basics := BucketBasics{s3Client}
 
 	// List and process documents
@@ -51,7 +51,7 @@ func (basics BucketBasics) ProcessDocuments(ctx context.Context, bucketName, pre
 	paginator := s3.NewListObjectsV2Paginator(basics.S3Client, &s3.ListObjectsV2Input{
 		Bucket:    &bucketName,
 		Prefix:    &prefix,
-		Delimiter: aws.String("/"), // To treat '/' as a folder separator
+		Delimiter: aws.String("/"),
 	})
 
 	for paginator.HasMorePages() {
@@ -61,7 +61,7 @@ func (basics BucketBasics) ProcessDocuments(ctx context.Context, bucketName, pre
 		}
 
 		for _, object := range page.Contents {
-			if strings.HasSuffix(*object.Key, ".md") { // Only process .md files
+			if strings.HasSuffix(*object.Key, ".md") {
 				fmt.Printf("Processing file: %s\n", *object.Key)
 				data, err := basics.DownloadFile(ctx, bucketName, *object.Key)
 				if err != nil {
@@ -71,8 +71,7 @@ func (basics BucketBasics) ProcessDocuments(ctx context.Context, bucketName, pre
 
 				// Extract folder name and file name
 				relativePath := strings.TrimPrefix(*object.Key, prefix)
-				dir, file := path.Split(relativePath)
-				fmt.Print(dir)
+				_, file := path.Split(relativePath)
 				fileName := strings.TrimSuffix(file, ".md")
 
 				// Process the document

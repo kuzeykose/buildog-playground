@@ -10,7 +10,6 @@ npm install -D @tailwindcss/typography
 npx shadcn@latest init -d 
 npx shadcn add -a
 
-
 cd ..
 
 cd buildog
